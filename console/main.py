@@ -46,18 +46,22 @@ class EchoProtocol(protocol.Protocol):
     fileSize = 0
     def dataReceived(self, data):
         response = self.factory.app.handle_message(data)
-        if response:
-            if isFileTransfer:
-                self.transport.write(".")
-            else:
-                if re.search(L_CMD_FILE_S, response):
-                    isFileTransfer = True
-                    self.transport.write("FILE")
-                elif re.search(L_CMD_FILE_E, response):
-                    isFileTransfer = False
-                    self.transport.write("EOF")
-                else:
-                    self.transport.write(response)
+
+        xx = re.search(L_CMD_FILE_G, response)
+        if xx:
+            content = xx.groups()
+            # write file
+            filename = content[0]
+            hash = content[1]
+            filesize = content[2]
+            filecontent = content[3]
+
+            fd = open(filename,"w")
+            fd.write(filecontent)
+            fd.close()
+            
+            print_message("Compass", "GET FILE TRANSFER %s" % (len(filecontent),))
+
 
 class EchoFactory(protocol.Factory):
     protocol = EchoProtocol
@@ -67,25 +71,27 @@ class EchoFactory(protocol.Factory):
 G_NODES     = set([])
 G_MESSAGE   = ''
 G_FILE      = ''
+G_DST_FILE  = ''
 G_ISMSG_MODE= True
 
 G_CMD_ADD   = re.compile('^add\s+(.+:[0-9]+)')
 G_CMD_DEL   = re.compile('^del\s+(.+:[0-9]+)')
 G_CMD_LIST  = re.compile('^list')
 G_CMD_MSG   = re.compile('^msg\s+(.*)')
-G_CMD_FILE  = re.compile('^file\s+(.*)')
+G_CMD_FILE  = re.compile('^file\s+(.*)\s+(.*)')
 G_CMD_QUIT  = re.compile('^clear')
 G_CMD_HELP  = re.compile('^help')
 
 L_CMD_FILE_S= re.compile('^FILE\s+(.+)\s+(.+)\s+(.+)')
 L_CMD_FILE_E= re.compile('^EOF')
+L_CMD_FILE_G= re.compile("^FILE\s+(\S+)\s+(\S+)\s+(\S+)\n([\s\S]*)\nEOF\n")
 
 G_HELP      = """Compass2 (by http://qpython.org/compass2) 
 > add <host:port> : Add the server to the list
 > del <host:port> : Del the server from the list 
 > list : list all nodes
 > msg <message> : send a message to nodes list
-> file <filename> : send a file to nodes list
+> file <local> <remote>: send a file to nodes list
 > clear : delete all nodes"""
 
 G_cmdResult = Label(text=G_HELP,font_size=25)
@@ -105,14 +111,14 @@ class EchoClient(protocol.Protocol):
         else:
             #self.transport.write('FILE')
             file_size = os.path.getsize(G_FILE) 
-            line = "FILE %s %s %s\n" % (os.path.basename(G_FILE), get_file_md5_hash(G_FILE), file_size)
+            line = "FILE %s %s %s\n" % (G_DST_FILE, get_file_md5_hash(G_FILE), file_size)
             self.transport.write(line)
             print_message("Client", line)
 
             for bytes in read_bytes_from_file(G_FILE):
                 self.transport.write(bytes)
 
-            self.transport.write("EOF\n")
+            self.transport.write("\nEOF\n")
 
             print_message("Client", "FILE EOF")
 
@@ -139,7 +145,8 @@ class EchoClientFactory(protocol.ClientFactory):
 def on_text_validate_cmd_input(instance, val):
     global G_MESSAGE 
     global G_ISMSG_MODE 
-    global G_FILE 
+    global G_FILE, G_DST_FILE 
+    
     if val=='':
         G_cmdResult.text = G_HELP
     else:
@@ -181,6 +188,7 @@ def on_text_validate_cmd_input(instance, val):
                 cmdFlag = True
                 G_ISMSG_MODE = False
                 G_FILE = str(xx.groups()[0])
+                G_DST_FILE = str(xx.groups()[1])
                 print_message("Compass", 'File %s will be send to %s nodes' % (G_MESSAGE, len(G_NODES)))
 
                 for xx in G_NODES:
