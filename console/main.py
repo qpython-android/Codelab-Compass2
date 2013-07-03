@@ -15,6 +15,8 @@ How to use:
     
     4, input file <local file full path> <remote file full path> to transfer a file to server from client in your client side
 
+    Also, you can use your only device as server and client at the same time : )
+
 Further plan:
     This is a draft, We want to build it more powerful, If you are interesting in it, you can join us
     
