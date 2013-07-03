@@ -1,5 +1,6 @@
 Compass2
-Author: riverfor@gmail.com
+
+
 ================
 
 A distributed nodes nodes management framework based on twisted for qpython application
@@ -16,3 +17,7 @@ Functions of server include:
     1 Accept connection from compass client
     2 Collect node's information from compass client
     3 Send / recv text message or binary stream
+
+
+
+Author: riverfor@gmail.com, any question can mailto him
