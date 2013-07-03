@@ -19,55 +19,7 @@ from kivy.properties import ObjectProperty, StringProperty
 from twisted.internet import reactor
 from twisted.internet import protocol
 
-def read_bytes_from_file(file, chunk_size = 8100):
-    """ Read bytes from a file in chunks. """
-    
-    with open(file, 'rb') as file:
-        while True:
-            chunk = file.read(chunk_size)
-            
-            if chunk:
-                yield chunk
-            else:
-                break
-
-def get_file_md5_hash(file):
-    """ Returns file MD5 hash"""
-    
-    md5_hash = hashlib.md5()
-    for bytes in read_bytes_from_file(file):
-        md5_hash.update(bytes)
-        
-    return md5_hash.hexdigest()
-
-
-class EchoProtocol(protocol.Protocol):
-    isFileTransfer = False
-    fileSize = 0
-    def dataReceived(self, data):
-        response = self.factory.app.handle_message(data)
-
-        xx = re.search(L_CMD_FILE_G, response)
-        if xx:
-            content = xx.groups()
-            # write file
-            filename = content[0]
-            hash = content[1]
-            filesize = content[2]
-            filecontent = content[3]
-
-            fd = open(filename,"w")
-            fd.write(filecontent)
-            fd.close()
-            
-            print_message("Compass", "GET FILE TRANSFER %s" % (len(filecontent),))
-
-
-class EchoFactory(protocol.Factory):
-    protocol = EchoProtocol
-    def __init__(self, app):
-        self.app = app
-
+## Global Constants ##
 G_NODES     = set([])
 G_MESSAGE   = ''
 G_FILE      = ''
@@ -94,53 +46,47 @@ G_HELP      = """Compass2 (by http://qpython.org/compass2)
 > file <local> <remote>: send a file to nodes list
 > clear : delete all nodes"""
 
+## Global Controls ##
 G_cmdResult = Label(text=G_HELP,font_size=25)
 G_cmdInput  = TextInput(text='',font_size=40)
-
 G_cmdBtnLayout = BoxLayout(orientation='vertical',size_hint_x=None,width=200)
 
-class EchoClient(protocol.Protocol):
-    """
-    @Main entrance for handling the response from server in client side
-    """
+## Global function ##
+def read_bytes_from_file(file, chunk_size = 8100):
+    """ Read bytes from a file in chunks. """
+    
+    with open(file, 'rb') as file:
+        while True:
+            chunk = file.read(chunk_size)
+            
+            if chunk:
+                yield chunk
+            else:
+                break
 
-    def connectionMade(self):
-        if G_ISMSG_MODE:
-            self.transport.write(G_MESSAGE)
-            print_message("Client", 'sending message "%s"' % G_MESSAGE)
+def get_file_md5_hash(file):
+    """ Returns file MD5 hash"""
+    
+    md5_hash = hashlib.md5()
+    for bytes in read_bytes_from_file(file):
+        md5_hash.update(bytes)
+        
+    return md5_hash.hexdigest()
+
+
+## functions used in compass ##
+def print_message(cat, msg):
+    if G_cmdResult.text==G_HELP:
+        G_cmdResult.text = "[%s] %s" % (cat, msg)
+    else:
+        xx = "%s\n[%s] %s" % (G_cmdResult.text, cat, msg)
+        xx = xx.strip()
+        lines = xx.split("\n")
+
+        if len(lines)>7:
+            G_cmdResult.text = "\n".join(lines[len(lines)-7:])
         else:
-            #self.transport.write('FILE')
-            file_size = os.path.getsize(G_FILE) 
-            line = "FILE %s %s %s\n" % (G_DST_FILE, get_file_md5_hash(G_FILE), file_size)
-            self.transport.write(line)
-            print_message("Client", line)
-
-            for bytes in read_bytes_from_file(G_FILE):
-                self.transport.write(bytes)
-
-            self.transport.write("\nEOF\n")
-
-            print_message("Client", "FILE EOF")
-
-
-    """
-    @Main entrance for handling the response from server in client side
-    """
-    def dataReceived(self, data):
-        print_message("Client", 'dataReceived %s' % data)
-
-"""
-class EchoClientFactory(protocol.ClientFactory):
-    protocol = EchoClient
-    def __init__(self, app):
-        print_message("Client", "connection init")
-
-    def clientConnectionLost(self, conn, reason):
-        print_message("Client", "connection lost")
-
-    def clientConnectionFailed(self, conn, reason):
-        print_message("Client", "connection failed")
-"""
+            G_cmdResult.text = xx
 
 def on_text_validate_cmd_input(instance, val):
     global G_MESSAGE 
@@ -179,8 +125,8 @@ def on_text_validate_cmd_input(instance, val):
                 for xx in G_NODES:
                     item = xx.split(':')
                     #G_cmdResult.text = '%s %s:%s' % (G_cmdResult.text, item[0], item[1])
-                    #reactor.connectTCP(item[0], int(item[1]), EchoClientFactory(self))
-                    protocol.ClientCreator(reactor, EchoClient).connectTCP(item[0], int(item[1]))
+                    #reactor.connectTCP(item[0], int(item[1]), CompassClientFactory(self))
+                    protocol.ClientCreator(reactor, CompassClient).connectTCP(item[0], int(item[1]))
                     #G_cmdResult.text = 'sendto %s' % (socket,)
 
             xx = re.search(G_CMD_FILE, cmd)
@@ -194,8 +140,8 @@ def on_text_validate_cmd_input(instance, val):
                 for xx in G_NODES:
                     item = xx.split(':')
                     #G_cmdResult.text = '%s %s:%s' % (G_cmdResult.text, item[0], item[1])
-                    #reactor.connectTCP(item[0], int(item[1]), EchoClientFactory(self))
-                    protocol.ClientCreator(reactor, EchoClient).connectTCP(item[0], int(item[1]))
+                    #reactor.connectTCP(item[0], int(item[1]), CompassClientFactory(self))
+                    protocol.ClientCreator(reactor, CompassClient).connectTCP(item[0], int(item[1]))
                     #G_cmdResult.text = 'sendto %s' % (socket,)
 
 
@@ -236,6 +182,68 @@ def on_press_cmd_submit(instance):
     else:
         G_cmdResult.text = G_HELP
 
+
+###############################################
+class CompassProtocol(protocol.Protocol):
+    """ Support file transfer """
+
+    isFileTransfer = False
+    fileSize = 0
+    def dataReceived(self, data):
+        response = self.factory.app.handle_message(data)
+
+        xx = re.search(L_CMD_FILE_G, response)
+        if xx:
+            content = xx.groups()
+            # write file
+            filename = content[0]
+            hash = content[1]
+            filesize = content[2]
+            filecontent = content[3]
+
+            fd = open(filename,"w")
+            fd.write(filecontent)
+            fd.close()
+            
+            print_message("Compass", "GET FILE TRANSFER %s" % (len(filecontent),))
+
+
+class CompassFactory(protocol.Factory):
+    protocol = CompassProtocol
+    def __init__(self, app):
+        self.app = app
+
+class CompassClient(protocol.Protocol):
+    """
+    @Main entrance for handling the response from server in client side
+    """
+
+    def connectionMade(self):
+        if G_ISMSG_MODE:
+            self.transport.write(G_MESSAGE)
+            print_message("Client", 'sending message "%s"' % G_MESSAGE)
+        else:
+            #self.transport.write('FILE')
+            file_size = os.path.getsize(G_FILE) 
+            line = "FILE %s %s %s\n" % (G_DST_FILE, get_file_md5_hash(G_FILE), file_size)
+            self.transport.write(line)
+            print_message("Client", line)
+
+            for bytes in read_bytes_from_file(G_FILE):
+                self.transport.write(bytes)
+
+            self.transport.write("\nEOF\n")
+
+            print_message("Client", "FILE EOF")
+
+
+    """
+    @Main entrance for handling the response from server in client side
+    """
+    def dataReceived(self, data):
+        print_message("Client", 'dataReceived %s' % data)
+
+
 class CompassApp(App):
     def build(self):
         layout = BoxLayout(orientation='vertical')
@@ -246,7 +254,7 @@ class CompassApp(App):
         servBtn = Button(text='Start server')
         def on_press_serve_submit(instance):
             if servBtn.text=='Start server':
-                reactor.listenTCP(8000, EchoFactory(self))
+                reactor.listenTCP(8000, CompassFactory(self))
                 print_message("Compass", 'server started, serve on 8000')
                 servBtn.text='Stop server'
             else:
@@ -299,20 +307,6 @@ class CompassApp(App):
     def on_connection(self, connection):
         print_message("Compass", "connected succesfully!")
         self.connection = connection
-
-def print_message(cat, msg):
-    if G_cmdResult.text==G_HELP:
-        G_cmdResult.text = "[%s] %s" % (cat, msg)
-    else:
-        xx = "%s\n[%s] %s" % (G_cmdResult.text, cat, msg)
-        xx = xx.strip()
-        lines = xx.split("\n")
-
-        if len(lines)>7:
-            G_cmdResult.text = "\n".join(lines[len(lines)-7:])
-        else:
-            G_cmdResult.text = xx
-
 
 
 if __name__ == '__main__':
