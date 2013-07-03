@@ -1,5 +1,5 @@
 """
-This is the Compass console, it integrates the client and server side
+This is the Compass console, it integrates the client and server sides in one script
 
 How to use:
     You can install kivy <http://kivy.org/> to run this, just drag the main.py into the kivy icon
@@ -7,13 +7,13 @@ How to use:
 
     You can use one device (mobile or pc) as client, and us another device as server
     
-    1, Click start server in your server slide
+    1, Click start server in your server side
     
-    2, input add <serverip>:8000 to add the server
+    2, input add <serverip>:8000 to add the server in your client side
 
-    3, input msg "msg to say" to send msg to server
+    3, input msg "msg to say" to send msg to server in your client side
     
-    4, input file <local file full path> <remote file full path> to transfer a file to server from client
+    4, input file <local file full path> <remote file full path> to transfer a file to server from client in your client side
 
 Further plan:
     This is a draft, We want to build it more powerful, If you are interesting in it, you can join us
