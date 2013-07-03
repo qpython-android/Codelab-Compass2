@@ -1,3 +1,30 @@
+"""
+This is the Compass console, it integrates the client and server side
+
+How to use:
+    You can install kivy <http://kivy.org/> to run this, just drag the main.py into the kivy icon
+    If you are using the qpython on android, you can push the console on the qpython project directory and run it through run a project
+
+    You can use one device (mobile or pc) as client, and us another device as server
+    
+    1, Click start server in your server slide
+    
+    2, input add <serverip>:8000 to add the server
+
+    3, input msg "msg to say" to send msg to server
+    
+    4, input file <local file full path> <remote file full path> to transfer a file to server from client
+
+Further plan:
+    This is a draft, We want to build it more powerful, If you are interesting in it, you can join us
+    
+
+Feedback:
+    Any feedback is appreciate !
+    mailto: riverfor@gmail.com
+
+"""
+
 from kivy.support import install_twisted_reactor
 install_twisted_reactor()
 
